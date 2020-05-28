@@ -1,37 +1,52 @@
 import requests
-from random import randint
 
-#######################################
+class Error(Exception):
+    """Base class for exceptions in this module."""
+    pass
 
-def create(provider=0):
+class HTTPError(Error):
+    """Exception raised for http errors.
 
-    if (provider == "mission"):
-        artisinal_int = create_mission_integer()
-    elif (provider == "brooklyn"):
-        artisinal_int = create_brooklyn_integer()
-    else:
-        provider = randint(0,1)
-        if (provider == 0):
-            artisinal_int = create_mission_integer()
-        else:
-            artisinal_int = create_brooklyn_integer()
-            
-    return artisinal_int
+    Attributes:
+        message -- explanation of the error
+    """
 
-#######################################
+    def __init__(self, message):
+        self.message = message
 
-def create_brooklyn_integer():
+class LimitError(Error):
+    """Exception raised when user asks for too many integers at once."""
 
-    payload = {'method': 'brooklyn.integers.create'}
-    r = requests.post("http://api.brooklynintegers.com/rest", data=payload)
-    
-    return r.text
-    
+    def __init__(self, message):
+        self.message = message
 
-#######################################
 
-def create_mission_integer():
+def create_brooklyn_integer(num=1):
+    """Fetch Brooklyn Integers."""
 
-    payload = {'format': 'text'}
-    r = requests.post("http://www.missionintegers.com/next-int", data=payload)
-    return r.text
+    if num > 10:
+      raise LimitError("Please request less than 10 integers at a time.")
+      
+    params = {
+        'method': 'brooklyn.integers.create'
+    }
+
+    integers = []
+
+    for x in range(num):
+
+      try:
+        r = requests.post("https://api.brooklynintegers.com/rest", data=params)
+        r.raise_for_status()
+      except requests.exceptions.RequestException as err:
+        raise
+      
+      data = r.json()
+
+      if data['stat'] != 'ok':
+        err = str(data['error']['code']) + " " + data['error']['error']
+        raise HTTPError(err)
+
+      integers.append(r.json()['integer'])
+
+    return integers
